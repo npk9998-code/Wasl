@@ -293,8 +293,8 @@ textarea.inp{resize:vertical}
     <div class="mode-toggle-wrap">
       <div class="mode-toggle">
         <div class="mode-slider" id="modeSlider"></div>
-        <button class="mode-btn on" id="modeSellerBtn" onclick="setMode('sellers')">💵 المشترين</button>
-        <button class="mode-btn" id="modeBuyerBtn" onclick="setMode('buyers')">🔻البائعين</button>
+        <button class="mode-btn on" id="modeSellerBtn" onclick="setMode('sellers')">🏷️ البائعين</button>
+        <button class="mode-btn" id="modeBuyerBtn" onclick="setMode('buyers')">🛒 المشترين</button>
       </div>
     </div>
 
@@ -588,33 +588,29 @@ function fmtThousands(v){
 }
 // Attach live number formatting + Arabic digit normalization to all input fields
 function attachNumberInputs(){
-  // Convert Arabic/Hindi digits on all text inputs (blur)
-  document.querySelectorAll('.inp[type="text"], .inp[type="tel"], .inp[type="search"], textarea.inp').forEach(el=>{
+  // 1. كل حقول text/tel/search: تحويل أرقام عربية عند blur
+  document.querySelectorAll('.inp[type="text"], .inp[type="tel"], .inp[type="search"]').forEach(el=>{
     if(el._arabicAttached) return;
     el._arabicAttached=true;
     el.addEventListener('blur', function(){
       const west=toWesternDigits(this.value);
-      if(west!==this.value){ this.value=west; }
+      if(west!==this.value) this.value=west;
     });
   });
-  document.querySelectorAll('.inp[inputmode="numeric"], .inp[type="number"]').forEach(el=>{
-    if(el._numAttached) return;
-    el._numAttached=true;
-    el.addEventListener('input', function(){
-      const west=toWesternDigits(this.value);
-      if(west!==this.value){ this.value=west; }
-    });
-  });
-  // Price fields with comma formatting (type=text inputmode=numeric)
-  document.querySelectorAll('.inp[type="text"][inputmode="numeric"]').forEach(el=>{
-    if(el._commaAttached) return;
+
+  // 2. حقول السعر والميزانية (inputmode=numeric + type=text): فواصل عند blur
+  const priceSelectors=['f_price','f_budgetMin','f_budgetMax'];
+  priceSelectors.forEach(id=>{
+    const el=document.getElementById(id);
+    if(!el||el._commaAttached) return;
     el._commaAttached=true;
-    el.addEventListener('blur', function(){
-      const raw=toWesternDigits(this.value.replace(/,/g,''));
+    el.addEventListener('blur',function(){
+      const raw=toWesternDigits(this.value.replace(/,/g,'')).trim();
       const n=Number(raw);
-      if(!isNaN(n)&&raw!=='') this.value=n.toLocaleString('en-US');
+      if(raw!==''&&!isNaN(n)&&n>0) this.value=n.toLocaleString('en-US');
+      else this.value=raw;
     });
-    el.addEventListener('focus', function(){
+    el.addEventListener('focus',function(){
       this.value=this.value.replace(/,/g,'');
     });
   });
@@ -772,16 +768,16 @@ function renderList(){
     h+='<div class="filter-panel">'
       +'<div class="filter-panel-title">💰 نطاق '+pLabel+' (ريال)</div>'
       +'<div class="range-row" style="margin-bottom:10px">'
-      +'<input class="inp" type="number" inputmode="numeric" placeholder="من" value="'+x(priceMin)+'" style="text-align:center" onchange="priceMin=this.value;render()">'
+      +'<input class="inp" type="text" inputmode="numeric" placeholder="من" value="'+x(priceMin)+'" style="text-align:center" onblur="priceMin=toWesternDigits(this.value.replace(/,/g,\'\'));render()" onchange="priceMin=toWesternDigits(this.value.replace(/,/g,\'\'));render()">'
       +'<span class="range-sep">—</span>'
-      +'<input class="inp" type="number" inputmode="numeric" placeholder="إلى" value="'+x(priceMax)+'" style="text-align:center" onchange="priceMax=this.value;render()">'
+      +'<input class="inp" type="text" inputmode="numeric" placeholder="إلى" value="'+x(priceMax)+'" style="text-align:center" onblur="priceMax=toWesternDigits(this.value.replace(/,/g,\'\'));render()" onchange="priceMax=toWesternDigits(this.value.replace(/,/g,\'\'));render()">'
       +'</div>';
     if(mode==='sellers'){
       h+='<div class="filter-panel-title">📐 نطاق المساحة (م²)</div>'
         +'<div class="range-row" style="margin-bottom:10px">'
-        +'<input class="inp" type="number" inputmode="numeric" placeholder="من" value="'+x(areaMin)+'" style="text-align:center" onchange="areaMin=this.value;render()">'
+        +'<input class="inp" type="text" inputmode="numeric" placeholder="من" value="'+x(areaMin)+'" style="text-align:center" onblur="areaMin=toWesternDigits(this.value);render()" onchange="areaMin=toWesternDigits(this.value);render()">'
         +'<span class="range-sep">—</span>'
-        +'<input class="inp" type="number" inputmode="numeric" placeholder="إلى" value="'+x(areaMax)+'" style="text-align:center" onchange="areaMax=this.value;render()">'
+        +'<input class="inp" type="text" inputmode="numeric" placeholder="إلى" value="'+x(areaMax)+'" style="text-align:center" onblur="areaMax=toWesternDigits(this.value);render()" onchange="areaMax=toWesternDigits(this.value);render()">'
         +'</div>';
     }
     h+='<div class="filter-panel-title">🔃 ترتيب حسب</div>'
@@ -894,8 +890,14 @@ function onSearch(val){
 //  FORM TAB
 // ══════════════════════════════════════════════════
 function syncFormFromDOM(){
-  ['sellerName','sellerPhone','neighborhood','area','streetWidth','price','notes','budgetMin','budgetMax','areaMin','areaMax'].forEach(k=>{
-    const el=document.getElementById('f_'+k); if(el) form[k]=el.value;
+  ['sellerName','sellerPhone','neighborhood','area','streetWidth','notes','areaMin','areaMax'].forEach(k=>{
+    const el=document.getElementById('f_'+k);
+    if(el) form[k]=toWesternDigits(el.value);
+  });
+  // Price/budget: strip commas + convert
+  ['price','budgetMin','budgetMax'].forEach(k=>{
+    const el=document.getElementById('f_'+k);
+    if(el) form[k]=toWesternDigits(el.value).replace(/,/g,'');
   });
   const cityEl=document.getElementById('f_city'); if(cityEl) form.city=cityEl.value;
 }
@@ -942,8 +944,8 @@ function renderForm(){
 
   if(!isBuyer){
     // SELLER fields
-    h+='<div class="dual"><div><label class="lbl">المساحة (م²)</label><input id="f_area" class="inp" type="number" inputmode="numeric" placeholder="400" value="'+x(form.area||'')+'"></div>'
-      +'<div><label class="lbl">عرض الشارع (م)</label><input id="f_streetWidth" class="inp" type="number" inputmode="numeric" placeholder="15" value="'+x(form.streetWidth||'')+'"></div></div>'
+    h+='<div class="dual"><div><label class="lbl">المساحة (م²)</label><input id="f_area" class="inp" type="text" inputmode="numeric" placeholder="400" value="'+x(form.area||'')+'"></div>'
+      +'<div><label class="lbl">عرض الشارع (م)</label><input id="f_streetWidth" class="inp" type="text" inputmode="numeric" placeholder="15" value="'+x(form.streetWidth||'')+'"></div></div>'
       +'<div class="field"><label class="lbl">السعر (ريال)</label>'
       +'<input id="f_price" class="inp" type="text" inputmode="numeric" placeholder="1,200,000" value="'+x(form.price||'')+'" autocomplete="off">'
       +'<div style="margin-top:8px"><div class="neg-toggle'+(form.negotiable?' on':'')+'" onclick="toggleNeg()">'
@@ -953,15 +955,15 @@ function renderForm(){
     // BUYER fields
     h+='<div class="field"><label class="lbl">💰 الميزانية (ريال)</label>'
       +'<div class="range-row">'
-      +'<input id="f_budgetMin" class="inp" type="number" inputmode="numeric" placeholder="من" value="'+x(form.budgetMin||'')+'" style="text-align:center">'
+      +'<input id="f_budgetMin" class="inp" type="text" inputmode="numeric" placeholder="من" value="'+x(form.budgetMin||'')+'" style="text-align:center">'
       +'<span class="range-sep">—</span>'
-      +'<input id="f_budgetMax" class="inp" type="number" inputmode="numeric" placeholder="إلى" value="'+x(form.budgetMax||'')+'" style="text-align:center">'
+      +'<input id="f_budgetMax" class="inp" type="text" inputmode="numeric" placeholder="إلى" value="'+x(form.budgetMax||'')+'" style="text-align:center">'
       +'</div></div>'
       +'<div class="field"><label class="lbl">📐 المساحة المطلوبة (م²)</label>'
       +'<div class="range-row">'
-      +'<input id="f_areaMin" class="inp" type="number" inputmode="numeric" placeholder="من" value="'+x(form.areaMin||'')+'" style="text-align:center">'
+      +'<input id="f_areaMin" class="inp" type="text" inputmode="numeric" placeholder="من" value="'+x(form.areaMin||'')+'" style="text-align:center">'
       +'<span class="range-sep">—</span>'
-      +'<input id="f_areaMax" class="inp" type="number" inputmode="numeric" placeholder="إلى" value="'+x(form.areaMax||'')+'" style="text-align:center">'
+      +'<input id="f_areaMax" class="inp" type="text" inputmode="numeric" placeholder="إلى" value="'+x(form.areaMax||'')+'" style="text-align:center">'
       +'</div></div>';
   }
 
