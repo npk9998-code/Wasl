@@ -1,0 +1,457 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#0f172a">
+<title>نموذج عقاري</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800;900&display=swap" rel="stylesheet">
+<style>
+:root{
+  --gold:#f59e0b; --gold-d:#d97706;
+  --emerald:#10b981; --emerald-d:#059669;
+  --bg:#0f172a; --surf:#1e293b; --surf2:#0d1117;
+  --border:rgba(255,255,255,.07);
+  --text:#f1f5f9; --muted:#94a3b8; --dim:#475569;
+  --st:env(safe-area-inset-top,0px); --sb:env(safe-area-inset-bottom,0px);
+  /* dynamic theme */
+  --primary:var(--gold); --primary-d:var(--gold-d);
+  --primary-bg:rgba(245,158,11,.1); --primary-border:rgba(245,158,11,.3);
+  --hdr-from:#1a2744; --hdr-to:#0f172a;
+}
+body.buyer-mode{
+  --primary:var(--emerald); --primary-d:var(--emerald-d);
+  --primary-bg:rgba(16,185,129,.1); --primary-border:rgba(16,185,129,.3);
+  --hdr-from:#0d2818; --hdr-to:#0a1f14;
+}
+*,*::before,*::after{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html{height:100%;-webkit-text-size-adjust:100%}
+body{margin:0;font-family:'Tajawal',sans-serif;background:var(--bg);color:var(--text);min-height:100%;padding:calc(var(--st)+0px) 0 calc(var(--sb)+20px);transition:background .5s ease}
+input,select,textarea{font-size:16px!important;font-family:'Tajawal',sans-serif}
+
+/* Smooth theme transitions */
+.hdr, .inp, .submit-btn, .tgrid .tbtn.on, .dbtn, .neg-toggle{
+  transition: background .5s ease, border-color .5s ease, color .5s ease, box-shadow .5s ease;
+}
+
+.wrap{max-width:500px;margin:0 auto;padding:0 16px}
+
+/* Header */
+.hdr{background:linear-gradient(160deg,var(--hdr-from) 0%,var(--hdr-to) 100%);padding:calc(var(--st)+18px) 20px 18px;margin-bottom:20px;border-bottom:1px solid var(--primary-border);text-align:center;transition:background .5s ease,border-color .5s ease}
+.hdr-icon{width:52px;height:52px;background:linear-gradient(135deg,var(--primary),var(--primary-d));border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:26px;margin:0 auto 10px;box-shadow:0 4px 20px var(--primary-bg);transition:background .5s ease}
+.hdr-title{font-size:18px;font-weight:900;margin-bottom:4px}
+.hdr-sub{font-size:12px;color:var(--muted);line-height:1.5}
+
+/* Client type toggle */
+.ctype-wrap{margin-bottom:16px}
+.ctype-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.ctype-btn{border-radius:12px;padding:14px 8px;font-size:14px;font-weight:900;cursor:pointer;font-family:'Tajawal',sans-serif;border:2px solid #2a3548;background:rgba(255,255,255,.03);color:var(--muted);text-align:center;transition:all .4s ease;touch-action:manipulation}
+.ctype-btn.seller.on{border-color:#f59e0b;background:rgba(245,158,11,.12);color:#f59e0b}
+.ctype-btn.buyer.on{border-color:#10b981;background:rgba(16,185,129,.12);color:#10b981}
+.ctype-btn:active{transform:scale(.95)}
+
+/* Inputs */
+.inp{width:100%;padding:12px 13px;border-radius:12px;border:1.5px solid #2a3548;background:var(--surf2);color:var(--text);font-size:16px;font-family:'Tajawal',sans-serif;-webkit-appearance:none;outline:none;transition:border-color .18s,box-shadow .18s}
+.inp:focus{border-color:var(--primary);box-shadow:0 0 0 3px var(--primary-bg)}
+select.inp{cursor:pointer}
+textarea.inp{resize:vertical}
+.lbl{display:block;color:var(--muted);font-size:11px;margin-bottom:5px;font-weight:700}
+.field{margin-bottom:13px}
+.dual{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:13px}
+.req{color:var(--primary)}
+
+/* Range row */
+.range-row{display:flex;gap:7px;align-items:center}
+.range-row .inp{text-align:center}
+.range-sep{color:var(--dim);font-size:11px;flex-shrink:0}
+
+/* Direction buttons */
+.dgrid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.dbtn{border-radius:11px;padding:12px;font-size:14px;font-weight:800;cursor:pointer;font-family:'Tajawal',sans-serif;transition:all .15s;touch-action:manipulation;border-width:2px;border-style:solid;text-align:center;background:rgba(255,255,255,.03);color:#94a3b8}
+.dbtn.on{color:var(--text)}
+.dbtn:active{transform:scale(.95)}
+
+/* Type buttons */
+.tgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+.tgrid .tbtn{border-radius:10px;padding:10px 5px;font-size:12px;font-weight:800;cursor:pointer;font-family:'Tajawal',sans-serif;transition:all .15s;touch-action:manipulation;border:2px solid #2a3548;background:rgba(255,255,255,.03);color:var(--muted);text-align:center}
+.tgrid .tbtn.on{border-color:var(--primary);background:var(--primary-bg);color:var(--primary)}
+.tgrid .tbtn:active{transform:scale(.94)}
+
+/* Negotiable */
+.neg-toggle{display:flex;align-items:center;gap:9px;background:rgba(34,197,94,.07);border:1px solid rgba(34,197,94,.18);border-radius:10px;padding:10px 12px;cursor:pointer;transition:all .15s;-webkit-user-select:none;user-select:none}
+.neg-toggle.on{background:rgba(34,197,94,.14);border-color:rgba(34,197,94,.4)}
+.neg-dot{width:20px;height:20px;border-radius:6px;border:2px solid #2a3548;display:flex;align-items:center;justify-content:center;font-size:12px;flex-shrink:0;transition:all .15s}
+.neg-toggle.on .neg-dot{background:#22c55e;border-color:#22c55e}
+.neg-label{font-size:12px;font-weight:800;color:var(--muted)}
+.neg-toggle.on .neg-label{color:#22c55e}
+
+/* Submit */
+.submit-btn{width:100%;border:none;border-radius:13px;padding:15px;font-size:16px;font-weight:900;cursor:pointer;font-family:'Tajawal',sans-serif;background:linear-gradient(135deg,var(--primary),var(--primary-d));color:#fff;box-shadow:0 6px 20px var(--primary-bg);transition:all .5s ease;-webkit-user-select:none;user-select:none;touch-action:manipulation;margin-top:6px}
+.submit-btn:active{transform:scale(.97)}
+.submit-btn:disabled{opacity:.5;cursor:not-allowed}
+
+/* Success */
+.success{text-align:center;padding:40px 20px;display:none}
+.success.show{display:block}
+.form-wrap{display:block}
+.form-wrap.hide{display:none}
+.success-ic{font-size:64px;margin-bottom:14px;animation:pop .4s ease}
+@keyframes pop{0%{transform:scale(0)}80%{transform:scale(1.15)}100%{transform:scale(1)}}
+.success-t{font-size:20px;font-weight:900;margin-bottom:6px;color:var(--primary)}
+.success-s{color:var(--muted);font-size:13px;line-height:1.7;margin-bottom:24px}
+.again-btn{background:var(--primary-bg);border:1.5px solid var(--primary-border);color:var(--primary);font-size:14px;font-weight:800;padding:12px 24px;border-radius:11px;cursor:pointer;font-family:'Tajawal',sans-serif;touch-action:manipulation}
+
+/* Toast */
+.toast{position:fixed;top:calc(var(--st)+12px);left:50%;transform:translateX(-50%);z-index:999;color:#fff;padding:9px 18px;border-radius:12px;font-weight:800;font-size:12px;font-family:'Tajawal',sans-serif;box-shadow:0 6px 24px rgba(0,0,0,.55);white-space:nowrap;max-width:90vw;animation:tIn .22s ease;display:none}
+@keyframes tIn{from{opacity:0;transform:translate(-50%,10px)}to{opacity:1;transform:translate(-50%,0)}}
+
+/* Misc */
+.form-note{text-align:center;color:var(--dim);font-size:10px;margin-top:14px;line-height:1.5}
+.sec-divider{font-size:12px;font-weight:900;color:var(--muted);margin:16px 0 10px;padding-bottom:6px;border-bottom:1px solid var(--border)}
+.opt-note{font-size:9px;color:var(--dim);margin-right:4px}
+
+/* Dynamic section */
+.dynamic-fields{transition:opacity .3s ease}
+.dynamic-fields.hidden{display:none}
+</style>
+</head>
+<body>
+
+<div class="hdr">
+  <div class="wrap">
+    <div class="hdr-icon" id="hdrIcon">🏠</div>
+    <div class="hdr-title" id="hdrTitle">نموذج عقاري موحد</div>
+    <div class="hdr-sub" id="hdrSub">اختر نوعك وأدخل بياناتك</div>
+  </div>
+</div>
+
+<div class="wrap">
+  <div id="formWrap" class="form-wrap">
+
+    <div class="sec-divider">📌 معلومات العقار</div>
+
+    <!-- City -->
+    <div class="field">
+      <label class="lbl">🏙️ المدينة <span class="req">*</span></label>
+      <select id="c_city" class="inp">
+        <option value="">— اختر المدينة —</option>
+        <option value="الرياض" selected>الرياض</option>
+        <option value="مكة المكرمة">مكة المكرمة</option>
+        <option value="المدينة المنورة">المدينة المنورة</option>
+        <option value="الشرقية">الشرقية</option>
+        <option value="القصيم">القصيم</option>
+        <option value="حائل">حائل</option>
+        <option value="تبوك">تبوك</option>
+        <option value="جازان">جازان</option>
+        <option value="نجران">نجران</option>
+        <option value="الباحة">الباحة</option>
+        <option value="الجوف">الجوف</option>
+        <option value="الحدود الشمالية">الحدود الشمالية</option>
+        <option value="عسير">عسير</option>
+      </select>
+    </div>
+
+    <!-- Client type -->
+    <div class="field ctype-wrap">
+      <label class="lbl">👤 أنا... <span class="req">*</span></label>
+      <div class="ctype-grid">
+        <div class="ctype-btn seller on" id="ctSeller" onclick="setClientType('seller')">
+          🏷️ بائع<br><span style="font-size:10px;font-weight:500;opacity:.7">أعرض عقاراً للبيع</span>
+        </div>
+        <div class="ctype-btn buyer" id="ctBuyer" onclick="setClientType('buyer')">
+          🛒 مشتري<br><span style="font-size:10px;font-weight:500;opacity:.7">أبحث عن عقار</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Direction -->
+    <div class="field">
+      <label class="lbl">الاتجاه <span class="opt-note">(اختياري — اضغط مرتين للإلغاء)</span></label>
+      <div class="dgrid" id="dirBtns"></div>
+    </div>
+
+    <!-- Neighborhood -->
+    <div class="field">
+      <label class="lbl">الحي / الموقع <span class="opt-note">(اختياري)</span></label>
+      <input id="c_neighborhood" class="inp" type="text" placeholder="مثال: حي النزهة" autocomplete="off">
+    </div>
+
+    <!-- Property type (shared) -->
+    <div class="field">
+      <label class="lbl" id="propTypeLabel">نوع العقار <span class="opt-note">(اختياري — اضغط مرتين للإلغاء)</span></label>
+      <div class="tgrid" id="typeBtns"></div>
+    </div>
+
+    <!-- Payment method (shared) -->
+    <div class="field">
+      <label class="lbl">💳 طريقة الدفع <span class="opt-note">(اختياري — اضغط مرتين للإلغاء)</span></label>
+      <div class="tgrid" id="payBtns"></div>
+    </div>
+
+    <!-- ── SELLER FIELDS ── -->
+    <div id="sellerFields" class="dynamic-fields">
+      <div class="dual">
+        <div><label class="lbl">المساحة (م²)</label><input id="c_area" class="inp" type="number" placeholder="400"></div>
+        <div><label class="lbl">عرض الشارع (م)</label><input id="c_streetWidth" class="inp" type="number" placeholder="15"></div>
+      </div>
+      <div class="field">
+        <label class="lbl">السعر (ريال) <span class="opt-note">(اختياري)</span></label>
+        <input id="c_price" class="inp" type="text" placeholder="1,200,000" autocomplete="off">
+        <div style="margin-top:8px">
+          <div class="neg-toggle" id="negToggle" onclick="toggleNeg()">
+            <div class="neg-dot" id="negDot"></div>
+            <div class="neg-label">قابل للتفاوض</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── BUYER FIELDS ── -->
+    <div id="buyerFields" class="dynamic-fields hidden">
+      <div class="field">
+        <label class="lbl">💰 الميزانية (ريال) <span class="opt-note">(اختياري)</span></label>
+        <div class="range-row">
+          <input id="c_budgetMin" class="inp" type="number" inputmode="numeric" placeholder="من">
+          <span class="range-sep">—</span>
+          <input id="c_budgetMax" class="inp" type="number" inputmode="numeric" placeholder="إلى">
+        </div>
+      </div>
+      <div class="field">
+        <label class="lbl">📐 المساحة المطلوبة (م²) <span class="opt-note">(اختياري)</span></label>
+        <div class="range-row">
+          <input id="c_areaMin" class="inp" type="number" inputmode="numeric" placeholder="من">
+          <span class="range-sep">—</span>
+          <input id="c_areaMax" class="inp" type="number" inputmode="numeric" placeholder="إلى">
+        </div>
+      </div>
+    </div>
+
+    <div class="sec-divider">👤 معلومات التواصل</div>
+
+    <div class="field">
+      <label class="lbl" id="nameLabel">اسم البائع / المالك <span class="req">*</span></label>
+      <input id="c_sellerName" class="inp" type="text" placeholder="الاسم الكامل" autocomplete="name">
+    </div>
+    <div class="field">
+      <label class="lbl">رقم الجوال <span class="req">*</span></label>
+      <input id="c_sellerPhone" class="inp" type="tel" placeholder="05xxxxxxxx" autocomplete="tel" style="direction:ltr;text-align:right">
+    </div>
+
+    <div class="field">
+      <label class="lbl">ملاحظات وشروط خاصة <span class="opt-note">(اختياري)</span></label>
+      <textarea id="c_notes" class="inp" rows="3" placeholder="مثال: قريب من مسجد، دفع كاش، شارع معين..."></textarea>
+    </div>
+
+    <button class="submit-btn" id="submitBtn" onclick="submitForm()">📤 إرسال الطلب</button>
+    <div class="form-note">🔒 بياناتك آمنة ولن تُشارك مع أي طرف ثالث<br>سيتم مراجعة طلبك والتواصل معك قريباً</div>
+  </div>
+
+  <div id="successScreen" class="success">
+    <div class="success-ic">✅</div>
+    <div class="success-t" id="successTitle">تم إرسال طلبك بنجاح!</div>
+    <div class="success-s" id="successSub">شكراً لك.<br>تم استلام بياناتك وسيتم مراجعتها والتواصل معك في أقرب وقت.</div>
+    <button class="again-btn" onclick="resetForm()">➕ إرسال طلب آخر</button>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const DC = {
+  'شمال':{bg:'rgba(239,68,68,.12)',border:'#fca5a5',badge:'#ef4444'},
+  'جنوب':{bg:'rgba(202,138,4,.12)',border:'#fde047',badge:'#ca8a04'},
+  'شرق': {bg:'rgba(37,99,235,.12)',border:'#93c5fd',badge:'#2563eb'},
+  'غرب': {bg:'rgba(22,163,74,.12)',border:'#86efac',badge:'#16a34a'},
+};
+const DIRS  = ['شمال','جنوب','شرق','غرب'];
+const TYPES = ['أرض','فيلا','عمارة','شقة','محل'];
+const PAYMENT_METHODS = ['كاش','بنك','مختلط'];
+const PM_ICON = {'كاش':'💵','بنك':'🏦','مختلط':'🔀'};
+
+const BIN_ID  = '6a201cefda38895dfe80bb17';
+const API_KEY = '$2a$10$fMPSjoObVoP1y5rf6NflpO9VM/6TLwITEaA4l22nUkFKSzEkfLNna';
+const BIN_URL = 'https://api.jsonbin.io/v3/b/' + BIN_ID;
+
+let selDir='', selType='', selPay='', negotiable=false, clientType='seller';
+let toastT=null;
+
+function init(){
+  // Build direction buttons
+  const db = document.getElementById('dirBtns');
+  db.innerHTML = DIRS.map(d=>{
+    const c=DC[d];
+    return '<button class="dbtn" id="dir_'+d+'" onclick="toggleDir(\''+d+'\')" style="border-color:'+c.badge+'20">'+d+'</button>';
+  }).join('');
+  // Build type buttons
+  const tb = document.getElementById('typeBtns');
+  tb.innerHTML = TYPES.map(t=>'<button class="tbtn" id="type_'+t+'" onclick="toggleType(\''+t+'\')">'+t+'</button>').join('');
+  // Build payment method buttons
+  const pb = document.getElementById('payBtns');
+  pb.innerHTML = PAYMENT_METHODS.map(p=>'<button class="tbtn" id="pay_'+p+'" onclick="togglePay(\''+p+'\')">'+(PM_ICON[p]||'')+' '+p+'</button>').join('');
+}
+
+function setClientType(type){
+  clientType = type;
+  const isBuyer = type==='buyer';
+
+  // Toggle button styles
+  document.getElementById('ctSeller').className='ctype-btn seller'+(isBuyer?'':' on');
+  document.getElementById('ctBuyer').className='ctype-btn buyer'+(isBuyer?' on':'');
+
+  // Toggle body theme
+  document.body.className = isBuyer ? 'buyer-mode' : '';
+
+  // Toggle dynamic fields
+  document.getElementById('sellerFields').className='dynamic-fields'+(isBuyer?' hidden':'');
+  document.getElementById('buyerFields').className='dynamic-fields'+(isBuyer?'':' hidden');
+
+  // Update labels
+  document.getElementById('nameLabel').innerHTML=(isBuyer?'اسم المشتري':'اسم البائع / المالك')+' <span class="req">*</span>';
+  document.getElementById('propTypeLabel').innerHTML=(isBuyer?'نوع العقار المطلوب':'نوع العقار')+' <span class="opt-note">(اختياري — اضغط مرتين للإلغاء)</span>';
+
+  // Update header
+  document.getElementById('hdrIcon').textContent = isBuyer ? '🛒' : '🏠';
+  document.getElementById('hdrTitle').textContent = isBuyer ? 'نموذج طلب شراء' : 'نموذج عرض بيع';
+  document.getElementById('hdrSub').textContent   = isBuyer ? 'أدخل مواصفات العقار الذي تبحث عنه' : 'أدخل بيانات العقار وسيتم إرسالها للمراجعة';
+
+  // Update submit button text
+  document.getElementById('submitBtn').textContent = isBuyer ? '📤 إرسال طلب الشراء' : '📤 إرسال عرض البيع';
+}
+
+function toggleDir(d){
+  selDir = selDir===d ? '' : d;
+  DIRS.forEach(dd=>{
+    const btn=document.getElementById('dir_'+dd);
+    const c=DC[dd]; const on=selDir===dd;
+    btn.className='dbtn'+(on?' on':'');
+    btn.style.borderColor=on?c.badge:c.badge+'20';
+    btn.style.background=on?c.bg:'rgba(255,255,255,.03)';
+    btn.style.color=on?'#f1f5f9':'#94a3b8';
+  });
+}
+
+function toggleType(t){
+  selType = selType===t ? '' : t;
+  TYPES.forEach(tt=>{
+    const btn=document.getElementById('type_'+tt);
+    if(btn) btn.className='tbtn'+(selType===tt?' on':'');
+  });
+}
+
+function togglePay(p){
+  selPay = selPay===p ? '' : p;
+  PAYMENT_METHODS.forEach(pp=>{
+    const btn=document.getElementById('pay_'+pp);
+    if(btn) btn.className='tbtn'+(selPay===pp?' on':'');
+  });
+}
+
+function toggleNeg(){
+  negotiable = !negotiable;
+  document.getElementById('negToggle').className='neg-toggle'+(negotiable?' on':'');
+  document.getElementById('negDot').textContent=negotiable?'✓':'';
+}
+
+function toast(msg,type='ok'){
+  clearTimeout(toastT);
+  const el=document.getElementById('toast');
+  el.textContent=msg; el.style.display='block';
+  el.style.background=type==='err'?'#dc2626':type==='warn'?'#d97706':'#15803d';
+  toastT=setTimeout(()=>el.style.display='none',3500);
+}
+
+function submitForm(){
+  const city = document.getElementById('c_city').value;
+  const name = document.getElementById('c_sellerName').value.trim();
+  const phone= document.getElementById('c_sellerPhone').value.trim();
+
+  if(!city){ toast('⚠️ الرجاء اختيار المدينة','warn'); return; }
+  if(!name){ toast('⚠️ الرجاء إدخال الاسم','warn'); return; }
+  if(!phone){ toast('⚠️ الرجاء إدخال رقم الجوال','warn'); return; }
+
+  const btn=document.getElementById('submitBtn');
+  btn.disabled=true; btn.textContent='⏳ جاري الإرسال...';
+
+  const isBuyer=clientType==='buyer';
+  const entry={
+    id: gid(),
+    clientType: clientType,   // 'seller' | 'buyer'
+    city: city,
+    direction: selDir,
+    neighborhood: document.getElementById('c_neighborhood').value.trim(),
+    propertyType: selType,
+    sellerName: name,
+    sellerPhone: phone,
+    notes: document.getElementById('c_notes').value.trim(),
+    paymentMethod: selPay,
+    status: 'pending',
+    createdAt: Date.now(),
+  };
+
+  if(isBuyer){
+    entry.budgetMin = document.getElementById('c_budgetMin').value.trim();
+    entry.budgetMax = document.getElementById('c_budgetMax').value.trim();
+    entry.areaMin   = document.getElementById('c_areaMin').value.trim();
+    entry.areaMax   = document.getElementById('c_areaMax').value.trim();
+  } else {
+    entry.area        = document.getElementById('c_area').value.trim();
+    entry.streetWidth = document.getElementById('c_streetWidth').value.trim();
+    entry.price       = document.getElementById('c_price').value.trim();
+    entry.negotiable  = negotiable;
+  }
+
+  fetch(BIN_URL+'/latest',{headers:{'X-Master-Key':API_KEY,'X-Bin-Meta':'false'}})
+  .then(r=>r.ok?r.json():Promise.reject(r.status))
+  .then(data=>{
+    const inbox=Array.isArray(data)?data.filter(i=>i&&i.id):[];
+    inbox.unshift(entry);
+    return fetch(BIN_URL,{
+      method:'PUT',
+      headers:{'Content-Type':'application/json','X-Master-Key':API_KEY},
+      body:JSON.stringify(inbox)
+    });
+  })
+  .then(r=>r.ok?showSuccess():Promise.reject('save_failed'))
+  .catch(()=>{
+    toast('❌ حدث خطأ في الإرسال، تحقق من الاتصال','err');
+    btn.disabled=false;
+    btn.textContent=isBuyer?'📤 إرسال طلب الشراء':'📤 إرسال عرض البيع';
+  });
+}
+
+function showSuccess(){
+  const isBuyer=clientType==='buyer';
+  document.getElementById('successTitle').textContent=isBuyer?'تم إرسال طلبك بنجاح!':'تم إرسال عرضك بنجاح!';
+  document.getElementById('successSub').innerHTML='شكراً لك.<br>'+(isBuyer?'تم استلام طلب الشراء وسيتم التواصل معك في أقرب وقت.':'تم استلام بيانات العقار وسيتم مراجعتها والتواصل معك في أقرب وقت.');
+  document.getElementById('formWrap').className='form-wrap hide';
+  document.getElementById('successScreen').className='success show';
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+
+function resetForm(){
+  selDir=''; selType=''; selPay=''; negotiable=false; clientType='seller';
+  document.getElementById('formWrap').className='form-wrap';
+  document.getElementById('successScreen').className='success';
+  ['c_city','c_neighborhood','c_area','c_streetWidth','c_price','c_sellerName','c_sellerPhone','c_notes','c_budgetMin','c_budgetMax','c_areaMin','c_areaMax'].forEach(id=>{
+    const el=document.getElementById(id); if(el) el.value=id==='c_city'?'الرياض':'';
+  });
+  document.getElementById('submitBtn').disabled=false;
+  setClientType('seller');
+  DIRS.forEach(d=>{
+    const btn=document.getElementById('dir_'+d); const c=DC[d];
+    if(btn){ btn.className='dbtn'; btn.style.borderColor=c.badge+'20'; btn.style.background='rgba(255,255,255,.03)'; btn.style.color='#94a3b8'; }
+  });
+  TYPES.forEach(t=>{ const btn=document.getElementById('type_'+t); if(btn) btn.className='tbtn'; });
+  PAYMENT_METHODS.forEach(p=>{ const btn=document.getElementById('pay_'+p); if(btn) btn.className='tbtn'; });
+  document.getElementById('negToggle').className='neg-toggle';
+  document.getElementById('negDot').textContent='';
+}
+
+function gid(){ return Date.now().toString(36)+Math.random().toString(36).slice(2); }
+
+init();
+</script>
+</body>
+</html>
