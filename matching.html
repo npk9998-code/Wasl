@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>المطابقة العقارية</title>
+<link rel="manifest" href="manifest.json">
+<link rel="stylesheet" href="styles.css">
+<style>
+  .match-card{display:flex;flex-direction:column;gap:10px;}
+  .match-pair{display:flex;justify-content:space-between;align-items:center;}
+  .match-side{flex:1;}
+  .match-side h4{margin:0 0 2px;font-size:14.5px;}
+  .match-side p{margin:0;font-size:12.5px;color:var(--text-dim);}
+  .vs{font-size:12px;color:var(--text-dim);padding:0 8px;}
+</style>
+</head>
+<body data-mode="seller">
+
+<div class="topbar">
+  <div class="brand"><span class="dot"></span> المطابقة العقارية</div>
+</div>
+
+<div class="threshold-bar">
+  <div style="display:flex;justify-content:space-between;margin-bottom:8px;font-size:14px;">
+    <span>أقل نسبة مطابقة للعرض</span>
+    <span class="threshold-val" id="thresholdVal">60%</span>
+  </div>
+  <input type="range" id="thresholdSlider" min="0" max="100" value="60">
+</div>
+
+<div class="grid" id="matchesGrid"></div>
+
+<div class="overlay" id="overlay" onclick="if(event.target.id==='overlay') closeSheet()">
+  <div class="sheet" id="sheet"></div>
+</div>
+
+<div class="bottomnav">
+  <a href="index.html">🏠<span>الرئيسية</span></a>
+  <a href="matching.html" class="active">🎯<span>المطابقة</span></a>
+  <a href="client.html">➕<span>طلب جديد</span></a>
+</div>
+
+<script src="config.js"></script>
+<script src="shared.js"></script>
+<script>
+let allData = { sellers: [], buyers: [] };
+let threshold = 60;
+
+async function init(){
+  allData = await CloudStore.load();
+  render();
+}
+
+/* خوارزمية المطابقة: المدينة + نوع العقار + توافق السعر مع نطاق الميزانية
+   مع مكافأة إضافية على توافق الحي إن وجد */
+function computeMatch(seller, buyer){
+  let score = 0;
+  let max = 0;
+
+  // المدينة (وزن 35)
+  max += 35;
+  if (seller.city && buyer.city && seller.city === buyer.city) score += 35;
+  else return 0; // لا توجد مطابقة بدون توافق المدينة
+
+  // نوع العقار (وزن 25)
+  max += 25;
+  if (seller.propertyType && buyer.propertyType && seller.propertyType === buyer.propertyType) score += 25;
+
+  // توافق السعر مع نطاق الميزانية (وزن 30)
+  max += 30;
+  const price = Number(seller.price || 0);
+  const bFrom = Number(buyer.budgetFrom || 0);
+  const bTo = Number(buyer.budgetTo || Infinity);
+  if (price > 0 && price >= bFrom && price <= bTo) score += 30;
+  else if (price > 0 && bTo > 0) {
+    // قرب نسبي إذا كان خارج النطاق بهامش صغير (10%)
+    const margin = bTo * 0.1;
+    if (price <= bTo + margin && price >= bFrom - margin) score += 15;
+  }
+
+  // الحي (وزن 10) - مكافأة إضافية
+  max += 10;
+  const buyerNeighs = (buyer.neighborhoods || []).map(n=>n.trim());
+  if (seller.neighborhood && buyerNeighs.some(n => n && seller.neighborhood.includes(n))) score += 10;
+
+  return Math.round((score / max) * 100);
+}
+
+function buildMatches(){
+  const results = [];
+  allData.sellers.forEach(s => {
+    allData.buyers.forEach(b => {
+      const pct = computeMatch(s, b);
+      if (pct >= threshold) results.push({ seller: s, buyer: b, pct });
+    });
+  });
+  return results.sort((a,b) => b.pct - a.pct);
+}
+
+let currentMatches = [];
+
+function matchCardHtml(m, idx){
+  return `
+    <div class="card" onclick="openSheet(${idx})">
+      <div class="card-top">
+        <p class="card-title">${m.seller.propertyType} - ${m.seller.city}</p>
+        <span class="match-score">${m.pct}%</span>
+      </div>
+      <div class="match-pair">
+        <div class="match-side">
+          <h4>🏷️ ${m.seller.clientName}</h4>
+          <p>${formatNumberDisplay(m.seller.price)} ﷼ • ${m.seller.neighborhood||"—"}</p>
+        </div>
+        <span class="vs">⇄</span>
+        <div class="match-side" style="text-align:left;">
+          <h4>🔍 ${m.buyer.clientName}</h4>
+          <p>${formatNumberDisplay(m.buyer.budgetFrom)}-${formatNumberDisplay(m.buyer.budgetTo)} ﷼</p>
+        </div>
+      </div>
+    </div>`;
+}
+
+function render(){
+  currentMatches = buildMatches();
+  const grid = document.getElementById("matchesGrid");
+  grid.innerHTML = currentMatches.length ? currentMatches.map(matchCardHtml).join("") :
+    `<div class="empty-state">لا توجد مطابقات بنسبة ${threshold}% أو أعلى حالياً</div>`;
+}
+
+document.getElementById("thresholdSlider").addEventListener("input", (e)=>{
+  threshold = Number(e.target.value);
+  document.getElementById("thresholdVal").textContent = threshold + "%";
+  render();
+});
+
+function openSheet(idx){
+  const m = currentMatches[idx];
+  document.getElementById("sheet").innerHTML = `
+    <div class="sheet-handle"></div>
+    <h2 style="margin:0 0 14px;">نسبة المطابقة: <span style="color:var(--accent)">${m.pct}%</span></h2>
+    <h3 style="margin:0 0 6px;">🏷️ البائع</h3>
+    <div class="sheet-row"><span>الاسم</span><span>${m.seller.clientName}</span></div>
+    <div class="sheet-row"><span>الجوال</span><span>${m.seller.phone}</span></div>
+    <div class="sheet-row"><span>السعر</span><span>${formatNumberDisplay(m.seller.price)} ﷼</span></div>
+    <div class="sheet-row"><span>الحي</span><span>${m.seller.neighborhood||"—"}</span></div>
+    <h3 style="margin:16px 0 6px;">🔍 المشتري</h3>
+    <div class="sheet-row"><span>الاسم</span><span>${m.buyer.clientName}</span></div>
+    <div class="sheet-row"><span>الجوال</span><span>${m.buyer.phone}</span></div>
+    <div class="sheet-row"><span>الميزانية</span><span>${formatNumberDisplay(m.buyer.budgetFrom)}-${formatNumberDisplay(m.buyer.budgetTo)} ﷼</span></div>
+    <div class="sheet-actions">
+      <button class="btn btn-call" onclick="location.href='${telUrl(m.seller.phone)}'">📞 اتصال بالبائع</button>
+      <button class="btn btn-whatsapp" onclick="window.open('${whatsappChatUrl(m.seller.phone)}','_blank')">💬 واتساب البائع</button>
+    </div>
+    <div class="sheet-actions">
+      <button class="btn btn-call" onclick="location.href='${telUrl(m.buyer.phone)}'">📞 اتصال بالمشتري</button>
+      <button class="btn btn-whatsapp" onclick="window.open('${whatsappChatUrl(m.buyer.phone)}','_blank')">💬 واتساب المشتري</button>
+    </div>
+  `;
+  document.getElementById("overlay").classList.add("show");
+}
+function closeSheet(){ document.getElementById("overlay").classList.remove("show"); }
+
+init();
+if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(()=>{});
+</script>
+</body>
+</html>
