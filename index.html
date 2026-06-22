@@ -310,8 +310,8 @@ textarea.inp{resize:vertical}
     <div class="mode-toggle-wrap">
       <div class="mode-toggle">
         <div class="mode-slider" id="modeSlider"></div>
-        <button class="mode-btn on" id="modeSellerBtn" onclick="setMode('sellers')"> 💵 المشترين</button>
-        <button class="mode-btn" id="modeBuyerBtn" onclick="setMode('buyers')"> 🔻 البائعين </button>
+        <button class="mode-btn on" id="modeSellerBtn" onclick="setMode('sellers')"> 💵 المشترين </button>
+        <button class="mode-btn" id="modeBuyerBtn" onclick="setMode('buyers')"> البائعين🔻 </button>
       </div>
     </div>
 
@@ -440,6 +440,8 @@ const CITIES = ['الرياض','مكة المكرمة','المدينة المن�
 const INBOX_ARCHIVE_KEY = 'realestate_inbox_archive_v1'; // permanent local backup, never auto-cleared
 const IGNORED_MATCHES_KEY = 'realestate_ignored_matches_v5';
 const LOCAL_STATUS_KEY = 'realestate_inbox_status_local_v1'; // per-device approval/rejection status
+const SELLERS_KEY = 'realestate_sellers_v1'; // local-only, never synced to cloud
+const BUYERS_KEY  = 'realestate_buyers_v1';  // local-only, never synced to cloud
 
 const SUPABASE_URL = 'https://jqirtyjhkfivufleteek.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpxaXJ0eWpoa2ZpdnVmbGV0ZWVrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODIwNzUzMDUsImV4cCI6MjA5NzY1MTMwNX0.SK1xJ0Yd3aY6iBjhDAqWn0KUVStMBwQBaNSJmWdMpWQ';
@@ -545,6 +547,9 @@ async function init(){
   // matchThreshold always starts at 60 (default), not restored from localStorage
   try{ const s=JSON.parse(localStorage.getItem('realestate_seen_inbox')||'[]'); seenInbox=new Set(s); }catch(e){}
   try{ localStatus = JSON.parse(localStorage.getItem(LOCAL_STATUS_KEY)||'{}'); }catch(e){ localStatus={}; }
+  // Load sellers/buyers from localStorage (private, never synced to cloud)
+  try{ sellers = JSON.parse(localStorage.getItem(SELLERS_KEY)||'[]'); }catch(e){ sellers=[]; }
+  try{ buyers  = JSON.parse(localStorage.getItem(BUYERS_KEY)||'[]');  }catch(e){ buyers=[]; }
   applyTheme();
   render();
   await loadAllFromCloud();
@@ -557,13 +562,11 @@ async function loadAllFromCloud(){
   const dot = document.getElementById('sdot');
   if(dot) dot.style.background='#eab308';
   try{
-    const { data, error } = await sb.from('listings').select('*').order('created_at', { ascending:false });
+    // Fetch inbox items only (source='inbox') — sellers/buyers stay local
+    const { data, error } = await sb.from('listings').select('*').eq('source','inbox').order('created_at', { ascending:false });
     if(error) throw error;
     const rows = data || [];
-    sellers = rows.filter(r=>r.client_type==='seller' && r.status==='approved').map(rowToEntry);
-    buyers  = rows.filter(r=>r.client_type==='buyer'  && r.status==='approved').map(rowToEntry);
-    // Inbox tab shows anything that originally came from a client submission form
-    inbox = rows.filter(r=>r.source==='inbox').map(rowToEntry);
+    inbox = rows.map(rowToEntry);
     if(dot) dot.style.background='#22c55e';
   }catch(err){
     if(dot) dot.style.background='#ef4444';
@@ -574,7 +577,10 @@ async function loadAllFromCloud(){
 }
 
 function save(){
-  // Local-only settings (never synced)
+  // Sellers & buyers — private, local-only, never synced to cloud
+  try{ localStorage.setItem(SELLERS_KEY, JSON.stringify(sellers)); }catch(e){}
+  try{ localStorage.setItem(BUYERS_KEY,  JSON.stringify(buyers));  }catch(e){}
+  // Other local-only settings
   try{ localStorage.setItem(IGNORED_MATCHES_KEY, JSON.stringify(ignoredMatches)); }catch(e){}
   try{ localStorage.setItem('realestate_match_threshold', matchThreshold); }catch(e){}
   try{ localStorage.setItem('realestate_seen_inbox', JSON.stringify([...seenInbox])); }catch(e){}
@@ -784,8 +790,7 @@ async function toggleFavorite(id, ev){
   item.favorite=!item.favorite;
   setCurrentData(arr);
   save();
-  try{ await sb.from('listings').update({ favorite:item.favorite, updated_at:Date.now() }).eq('id', id); }
-  catch(err){ console.error('toggleFavorite error:', err); }
+  // sellers/buyers are local-only — no cloud sync needed
 }
 
 // ══════════════════════════════════════════════════
@@ -1143,7 +1148,7 @@ function renderForm(){
 
   h+='<button class="btn b-primary" style="padding:14px" onclick="submitForm()">'+(editId?'💾 حفظ التعديل':'✅ إضافة')+'</button>'
     +(editId?'<button class="btn b-ghost" style="margin-top:8px" onclick="cancelEdit()">إلغاء</button>':'')
-    +'<div class="form-note">☁️ البيانات محفوظة على السحابة وتتزامن تلقائياً</div></div>';
+    +'<div class="form-note">🔒 بياناتك محفوظة على جهازك فقط ولا ترفع للإنترنت</div></div>';
   return h;
 }
 
@@ -1181,17 +1186,7 @@ async function submitForm(){
     else sellers.unshift(entry);
   }
 
-  try{
-    if(editId){
-      await sb.from('listings').update(entryToRow(entry, { status:'approved', source:'manual' })).eq('id', editId);
-    } else {
-      await sb.from('listings').insert(entryToRow(entry, { status:'approved', source:'manual' }));
-    }
-  }catch(err){
-    console.error('submitForm save error:', err);
-    toast('⚠️ تعذر الحفظ على السحابة، تحقق من الاتصال','err');
-  }
-
+  // sellers/buyers are saved to localStorage only — private, never synced to cloud
   toast(editId?'✅ تم حفظ التعديل':'✅ تمت الإضافة');
   form=EF(); editId=null;
   // sync mode to entry type
@@ -1516,8 +1511,7 @@ function openDel(id){ delId=id; closeOverlay('detOverlay'); document.getElementB
 async function confirmDel(){
   if(mode==='sellers') sellers=sellers.filter(o=>o.id!==delId);
   else buyers=buyers.filter(o=>o.id!==delId);
-  try{ await sb.from('listings').delete().eq('id', delId); }
-  catch(err){ console.error('confirmDel error:', err); toast('⚠️ تعذر الحذف من السحابة','warn'); }
+  // sellers/buyers are local-only — no cloud delete needed
   toast('🗑️ تم الحذف','info'); closeOverlay('delOverlay'); save();
 }
 function clearAll(){
@@ -1526,12 +1520,10 @@ function clearAll(){
   document.getElementById('clearAllOverlay').style.display='flex';
 }
 async function confirmClearAll(){
-  const ids=(mode==='sellers'?sellers:buyers).map(o=>o.id);
   if(mode==='sellers') sellers=[]; else buyers=[];
   toast('🗑️ تم الحذف','info');
   closeOverlay('clearAllOverlay'); save();
-  try{ if(ids.length) await sb.from('listings').delete().in('id', ids); }
-  catch(err){ console.error('confirmClearAll error:', err); toast('⚠️ تعذر الحذف الكامل من السحابة','warn'); }
+  // sellers/buyers are local-only — no cloud delete needed
 }
 
 // ══════════════════════════════════════════════════
@@ -1763,11 +1755,7 @@ async function approveInbox(id){
   if(!exists){
     const entry={...req, createdAt:req.createdAt||Date.now()};
     if(isBuyer) buyers.unshift(entry); else sellers.unshift(entry);
-    // Insert a separate copy as a normal approved listing (so the inbox item stays visible too)
-    const copy={...entry, id:gid()};
-    try{
-      await sb.from('listings').insert(entryToRow(copy, { status:'approved', source:'manual' }));
-    }catch(err){ console.error('approveInbox insert error:', err); toast('⚠️ تعذر حفظ النسخة على السحابة','warn'); }
+    // sellers/buyers are local-only — no cloud insert for the approved copy
 
     // Count new matches this entry creates
     const others=isBuyer?sellers:buyers;
@@ -1791,9 +1779,7 @@ async function reApproveInbox(id){
   const isBuyer=req.clientType==='buyer';
   const entry={...req, id:gid(), createdAt:Date.now()}; // new copy
   if(isBuyer) buyers.unshift(entry); else sellers.unshift(entry);
-  try{
-    await sb.from('listings').insert(entryToRow(entry, { status:'approved', source:'manual' }));
-  }catch(err){ console.error('reApproveInbox insert error:', err); toast('⚠️ تعذر حفظ النسخة على السحابة','warn'); }
+  // sellers/buyers are local-only — no cloud insert needed
   toast('🔄 تم النقل مجدداً — أُضيف كإدخال جديد','info');
   closeOverlay('approveOverlay'); save();
 }
@@ -2349,20 +2335,14 @@ function doImportInbox(input){
       if(!Array.isArray(data)) throw new Error();
       const existIds=new Set(inbox.map(i=>i.id));
       let added=0;
-      const newRows=[];
       data.forEach(item=>{
         if(!item||!item.id||existIds.has(item.id)) return;
         inbox.push(item); existIds.add(item.id); added++;
-        newRows.push(entryToRow(item, { status: item.status||'pending', source:'inbox' }));
       });
       inbox.sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
       input.value='';
       toast('✅ تمت استعادة '+added+' طلب من النسخة الاحتياطية');
       render();
-      if(newRows.length){
-        try{ await sb.from('listings').upsert(newRows); }
-        catch(err){ console.error('doImportInbox cloud save error:', err); toast('⚠️ تم الاستيراد محلياً لكن تعذر رفعه للسحابة','warn'); }
-      }
     }catch(err){
       toast('❌ ملف غير صالح','err');
       input.value='';
@@ -2379,7 +2359,6 @@ async function doImport(input){
       let data=JSON.parse(e.target.result);
       if(!Array.isArray(data)) throw new Error();
       let added=0;
-      const newRows=[];
       const existIds=new Set([...sellers,...buyers].map(o=>o.id));
       data.forEach(item=>{
         if(!item||item.id&&existIds.has(item.id)) return;
@@ -2387,13 +2366,9 @@ async function doImport(input){
         const isBuyer=newItem.clientType==='buyer';
         if(isBuyer) buyers.push(newItem); else sellers.push(newItem);
         existIds.add(newItem.id); added++;
-        newRows.push(entryToRow(newItem, { status:'approved', source:'manual' }));
       });
       save(); closeOverlay('importOverlay'); toast('✅ تمت إضافة '+added+' إدخال');
-      if(newRows.length){
-        try{ await sb.from('listings').insert(newRows); }
-        catch(err){ console.error('doImport cloud save error:', err); toast('⚠️ تم الاستيراد محلياً لكن تعذر رفعه للسحابة','warn'); }
-      }
+      // sellers/buyers are local-only — no cloud sync
     }catch(err){ toast('❌ ملف غير صالح','err'); }
   };
   reader.readAsText(file,'utf-8');
