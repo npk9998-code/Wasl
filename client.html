@@ -250,7 +250,11 @@ textarea.inp{resize:vertical}
       <textarea id="c_notes" class="inp" rows="3" placeholder="مثال: قريب من مسجد، دفع كاش، شارع معين..."></textarea>
     </div>
 
-    <div class="cf-turnstile" data-sitekey="0x4AAAAAADvjrIOXhfmpiUt_" data-callback="onTurnstileSuccess" data-expired-callback="onTurnstileExpired" style="margin-bottom:10px;display:flex;justify-content:center"></div>
+    <div class="cf-turnstile" id="turnstileWidget" data-sitekey="0x4AAAAAADvjrIOXhfmpiUt_" data-callback="onTurnstileSuccess" data-expired-callback="onTurnstileExpired" data-error-callback="onTurnstileError" data-timeout-callback="onTurnstileError" style="margin-bottom:10px;display:flex;justify-content:center;min-height:65px"></div>
+    <div id="turnstileFallback" style="display:none;background:rgba(217,119,6,.12);border:1px solid rgba(217,119,6,.4);border-radius:8px;padding:10px;margin-bottom:10px;text-align:center;font-size:12px;color:#fbbf24">
+      ⚠️ تعذر تحميل التحقق الأمني. تأكد من اتصالك بالإنترنت ثم
+      <a href="javascript:location.reload()" style="color:#fbbf24;text-decoration:underline;font-weight:800">اضغط هنا لإعادة تحميل الصفحة</a>
+    </div>
     <button class="submit-btn" id="submitBtn" onclick="submitForm()">📤 إرسال الطلب</button>
     <div class="form-note">🔒 بياناتك آمنة ولن تُشارك مع أي طرف ثالث<br>سيتم مراجعة طلبك والتواصل معك قريباً</div>
   </div>
@@ -289,8 +293,33 @@ let selDir='', selType='', selPay='', negotiable=false, clientType='seller';
 let toastT=null;
 let turnstileToken=null;
 
-function onTurnstileSuccess(token){ turnstileToken=token; }
+function onTurnstileSuccess(token){
+  turnstileToken=token;
+  document.getElementById('turnstileFallback').style.display='none';
+}
 function onTurnstileExpired(){ turnstileToken=null; }
+
+// If the widget errors, times out, or never even loads (script blocked by
+// network/privacy features), show a clear retry message instead of leaving
+// the visitor stuck on a submit button that silently does nothing.
+let turnstileRetries=0;
+function onTurnstileError(){
+  turnstileToken=null;
+  if(turnstileRetries<2 && typeof turnstile!=='undefined'){
+    turnstileRetries++;
+    try{ turnstile.reset(); }catch(e){}
+  } else {
+    document.getElementById('turnstileFallback').style.display='block';
+  }
+}
+// Catches the case where the Cloudflare script itself never loaded at all
+// (e.g. blocked by a privacy feature) — the callbacks above never fire in
+// that case, so we check independently.
+setTimeout(()=>{
+  if(typeof turnstile==='undefined'){
+    document.getElementById('turnstileFallback').style.display='block';
+  }
+}, 8000);
 
 // Basic per-device cooldown to slow down accidental/rapid resubmission.
 // This is a UX-level guard, not a security boundary — Turnstile + the Edge
