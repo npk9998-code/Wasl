@@ -4,9 +4,6 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <meta name="theme-color" content="#0f172a">
-<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
-<meta http-equiv="Pragma" content="no-cache">
-<meta http-equiv="Expires" content="0">
 <title>نموذج عقاري</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -252,10 +249,6 @@ textarea.inp{resize:vertical}
       <textarea id="c_notes" class="inp" rows="3" placeholder="مثال: قريب من مسجد، دفع كاش، شارع معين..."></textarea>
     </div>
 
-    <div id="turnstileWidget" style="margin-bottom:10px;display:flex;justify-content:center;min-height:65px"></div>
-    <div id="turnstileFallback" style="display:none;background:rgba(217,119,6,.12);border:1px solid rgba(217,119,6,.4);border-radius:8px;padding:10px;margin-bottom:10px;text-align:center;font-size:12px;color:#fbbf24">
-      ⏳ جاري التحقق الأمني... إذا استمرت هذه الرسالة، يمكنك المتابعة والإرسال بأمان
-    </div>
     <button class="submit-btn" id="submitBtn" onclick="submitForm()">📤 إرسال الطلب</button>
     <div class="form-note">🔒 بياناتك آمنة ولن تُشارك مع أي طرف ثالث<br>سيتم مراجعة طلبك والتواصل معك قريباً</div>
   </div>
@@ -286,91 +279,17 @@ const SUPABASE_URL = 'https://jqirtyjhkfivufleteek.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpxaXJ0eWpoa2ZpdnVmbGV0ZWVrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODIwNzUzMDUsImV4cCI6MjA5NzY1MTMwNX0.SK1xJ0Yd3aY6iBjhDAqWn0KUVStMBwQBaNSJmWdMpWQ';
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-// Submissions go through this Edge Function, which verifies the Turnstile token
-// server-side (with the secret key) and only then inserts the row.
-const SUBMIT_ENDPOINT = SUPABASE_URL + '/functions/v1/verify-submit';
+// رابط n8n webhook (عقدة "Wasl Callback") — يُستخدم لإبلاغ n8n بعد استلام بيانات العميل
+// حتى يقوم بمطابقة الرقم وإرسال رسالة تأكيد عبر واتساب
+const N8N_WEBHOOK_URL = 'https://npk9998.app.n8n.cloud/webhook/wasl-callback';
+
+// قراءة serialId من رابط الصفحة (مثال: client.html?id=WASL-1234)
+// هذا الرقم يربط تعبئة النموذج برسالة واتساب الأصلية اللي جاء منها العميل
+const urlParams = new URLSearchParams(window.location.search);
+const serialId = urlParams.get('id') || '';
 
 let selDir='', selType='', selPay='', negotiable=false, clientType='seller';
 let toastT=null;
-let turnstileToken=null;
-let turnstileWidgetId=null;
-let turnstileUnavailable=false; // true if Turnstile never became available after retries
-
-const TURNSTILE_SITE_KEY = '0x4AAAAAADvjrIOXhfmpiUt_';
-
-function onTurnstileSuccess(token){
-  turnstileToken=token;
-  document.getElementById('turnstileFallback').style.display='none';
-}
-function onTurnstileExpired(){
-  turnstileToken=null;
-  try{ if(turnstileWidgetId!=null) turnstile.reset(turnstileWidgetId); }catch(e){}
-}
-function onTurnstileError(){
-  try{ if(turnstileWidgetId!=null) turnstile.reset(turnstileWidgetId); }catch(e){}
-}
-
-function renderTurnstileWidget(){
-  try{
-    turnstileWidgetId = turnstile.render('#turnstileWidget', {
-      sitekey: TURNSTILE_SITE_KEY,
-      callback: onTurnstileSuccess,
-      'expired-callback': onTurnstileExpired,
-      'error-callback': onTurnstileError,
-      'timeout-callback': onTurnstileError,
-    });
-    document.getElementById('turnstileFallback').style.display='none';
-  }catch(e){
-    console.error('Turnstile render failed:', e);
-  }
-}
-
-// Load the Cloudflare script ourselves (instead of a static <script> tag) so we
-// can retry if it fails — this covers flaky connections, ad/privacy blockers,
-// or iCloud Private Relay occasionally interfering with the request.
-let scriptLoadAttempts=0;
-function loadTurnstileScript(){
-  scriptLoadAttempts++;
-  const s=document.createElement('script');
-  s.src='https://challenges.cloudflare.com/turnstile/v0/api.js?_retry='+scriptLoadAttempts;
-  s.async=true;
-  s.onload=renderTurnstileWidget;
-  s.onerror=handleTurnstileUnavailable;
-  document.head.appendChild(s);
-}
-
-function handleTurnstileUnavailable(){
-  if(scriptLoadAttempts<3){
-    setTimeout(loadTurnstileScript, 1500);
-    return;
-  }
-  // After 3 failed attempts, don't block a real customer from submitting —
-  // let the request through unverified and flag it so it can be reviewed.
-  turnstileUnavailable=true;
-  document.getElementById('turnstileFallback').textContent =
-    '✅ يمكنك إرسال طلبك مباشرة (التحقق الأمني غير متاح حالياً على هذا المتصفح)';
-  document.getElementById('turnstileFallback').style.color = '#22c55e';
-  document.getElementById('turnstileFallback').style.background = 'rgba(34,197,94,.1)';
-  document.getElementById('turnstileFallback').style.borderColor = 'rgba(34,197,94,.4)';
-  document.getElementById('turnstileFallback').style.display='block';
-}
-
-loadTurnstileScript();
-// Independent safety net: if nothing has happened after 10s (no success, no
-// error callback fired — a true silent failure), fall back the same way.
-setTimeout(()=>{
-  if(!turnstileToken && !turnstileUnavailable) handleTurnstileUnavailable();
-}, 10000);
-
-// Basic per-device cooldown to slow down accidental/rapid resubmission.
-// This is a UX-level guard, not a security boundary — Turnstile + the Edge
-// Function are what actually stop abuse.
-const SUBMIT_COOLDOWN_MS = 2*60*1000; // 2 minutes
-function getRemainingCooldown(){
-  const last=Number(localStorage.getItem('wasl_last_submit')||0);
-  const remaining=SUBMIT_COOLDOWN_MS-(Date.now()-last);
-  return remaining>0?remaining:0;
-}
 
 function init(){
   // Build direction buttons
@@ -507,16 +426,6 @@ async function submitForm(){
   if(!name){ toast('⚠️ الرجاء إدخال الاسم','warn'); return; }
   if(!phone){ toast('⚠️ الرجاء إدخال رقم الجوال','warn'); return; }
 
-  const cooldown=getRemainingCooldown();
-  if(cooldown>0){
-    toast('⏳ الرجاء الانتظار '+Math.ceil(cooldown/1000)+' ثانية قبل إرسال طلب آخر','warn');
-    return;
-  }
-  if(!turnstileToken && !turnstileUnavailable){
-    toast('⚠️ الرجاء إكمال التحقق الأمني أعلاه','warn');
-    return;
-  }
-
   const btn=document.getElementById('submitBtn');
   btn.disabled=true; btn.textContent='⏳ جاري الإرسال...';
 
@@ -551,6 +460,7 @@ async function submitForm(){
 
   const row={
     id: entry.id,
+    serial_id: serialId || null,
     client_type: entry.clientType,
     status: 'pending',
     source: 'inbox',
@@ -576,18 +486,18 @@ async function submitForm(){
   };
 
   try{
-    const res = await fetch(SUBMIT_ENDPOINT, {
-      method:'POST',
-      headers:{
-        'Content-Type':'application/json',
-        'apikey': SUPABASE_KEY,
-        'Authorization':'Bearer '+SUPABASE_KEY,
-      },
-      body: JSON.stringify({ row, token: turnstileToken, bypass: turnstileUnavailable }),
-    });
-    const data = await res.json().catch(()=>({}));
-    if(!res.ok || data.error) throw new Error(data.error || ('HTTP '+res.status));
-    localStorage.setItem('wasl_last_submit', String(Date.now()));
+    const { error } = await sb.from('listings').insert(row);
+    if(error) throw error;
+
+    // إبلاغ n8n بالخلفية (لا ننتظره ولا نعرض خطأ للعميل لو فشل — بياناته محفوظة أصلاً في Supabase)
+    if(N8N_WEBHOOK_URL){
+      fetch(N8N_WEBHOOK_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ serialId: serialId, ...entry })
+      }).catch(err => console.error('n8n webhook error:', err));
+    }
+
     showSuccess();
   }catch(err){
     console.error('Submit error:', err);
@@ -596,12 +506,9 @@ async function submitForm(){
     if(errStr.includes('403')) msg='❌ خطأ في صلاحية الوصول (403) — راسل مدير النظام';
     else if(errStr.includes('404')) msg='❌ لم يتم العثور على قاعدة البيانات (404)';
     else if(errStr.includes('429')) msg='❌ تم تجاوز الحد المسموح من الطلبات، حاول لاحقاً';
-    else if(errStr.includes('التحقق')) msg='❌ '+errStr;
     toast(msg,'err');
     btn.disabled=false;
     btn.textContent=isBuyer?'📤 إرسال طلب الشراء':'📤 إرسال عرض البيع';
-    if(typeof turnstile!=='undefined') turnstile.reset();
-    turnstileToken=null;
   }
 }
 
