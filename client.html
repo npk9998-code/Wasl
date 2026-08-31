@@ -497,7 +497,30 @@ async function submitForm(){
   };
 
   try{
-    const { error } = await sb.from('listings').insert(row);
+    console.log('submitForm: sending row →', row);
+
+    // Race the insert against a timeout — without this, a stalled/blocked
+    // network request (ad-blocker, VPN, flaky connection) leaves the button
+    // stuck on "جاري الإرسال..." forever with no error and no way to retry.
+    const insertPromise = sb.from('listings').insert(row);
+    const timeoutPromise = new Promise((_, reject)=>
+      setTimeout(()=>reject(new Error('TIMEOUT: لم يصل رد من الخادم خلال 15 ثانية')), 15000)
+    );
+    let { error } = await Promise.race([insertPromise, timeoutPromise]);
+    console.log('submitForm: insert result →', error || 'OK');
+
+    // Self-healing fallback: if the DB doesn't have the whatsapp_phone column
+    // yet (migration not run), retry once without it instead of failing the
+    // whole submission. Once the column is added, this branch simply won't
+    // trigger anymore.
+    if(error && /column .* does not exist|could not find/i.test(error.message||'')){
+      const rowWithoutPhone = Object.assign({}, row);
+      delete rowWithoutPhone.whatsapp_phone;
+      const retryPromise = sb.from('listings').insert(rowWithoutPhone);
+      const retry = await Promise.race([retryPromise, timeoutPromise]);
+      error = retry.error;
+    }
+
     if(error) throw error;
     showSuccess();
   }catch(err){
@@ -512,6 +535,8 @@ async function submitForm(){
     if(code==='42501' || /row-level security|permission denied/i.test(errStr)){
       // Most common cause: the anon role has no INSERT policy on `listings`.
       msg='❌ الصلاحيات (RLS) تمنع الإرسال — راجع سياسة الإدراج على جدول listings';
+    } else if(errStr.startsWith('TIMEOUT')){
+      msg='⏱️ لم يصل رد من الخادم — تحقق من الاتصال بالإنترنت أو أوقف مانع الإعلانات وحاول مجدداً';
     } else if(/column .* does not exist|could not find/i.test(errStr)){
       // Payload includes a field the table doesn't have yet (e.g. whatsapp_phone).
       msg='❌ عمود غير موجود في قاعدة البيانات — راجع مخطط الجدول';
