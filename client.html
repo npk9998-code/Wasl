@@ -288,7 +288,20 @@ const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 // Submissions go through this Edge Function, which verifies the Turnstile token
 // server-side (with the secret key) and only then inserts the row.
+// The n8n webhook forward also happens server-side, inside this same function —
+// see the accompanying edge-function snippet for that part.
 const SUBMIT_ENDPOINT = SUPABASE_URL + '/functions/v1/verify-submit';
+
+// ── Incoming link parameters (?phone=9665XXXXXXXX&role=seller|buyer) ──
+// phone: optional. If present, it's the WhatsApp conversation number the
+//        customer arrived from; we both prefill the phone field and pass it
+//        through untouched as whatsapp_phone so it can be distinguished from
+//        whatever contact number the customer types manually.
+// role:  optional. If it's exactly 'seller' or 'buyer' we preselect that tab;
+//        the buttons stay fully interactive either way.
+const urlParams = new URLSearchParams(window.location.search);
+const whatsappPhone = urlParams.get('phone') || '';
+const initialRole = urlParams.get('role') || '';
 
 let selDir='', selType='', selPay='', negotiable=false, clientType='seller';
 let toastT=null;
@@ -391,6 +404,15 @@ function init(){
     const el=document.getElementById(id);
     if(el) el.addEventListener('input', onMoneyInput);
   });
+
+  // Apply incoming link parameters, if any
+  if(initialRole==='seller' || initialRole==='buyer'){
+    setClientType(initialRole);
+  }
+  if(whatsappPhone){
+    const phoneEl=document.getElementById('c_sellerPhone');
+    if(phoneEl) phoneEl.value = whatsappPhone;
+  }
 }
 
 // Convert Arabic-Indic / Persian digits to standard English digits
@@ -524,6 +546,7 @@ async function submitForm(){
   const entry={
     id: gid(),
     clientType: clientType,   // 'seller' | 'buyer'
+    whatsappPhone: whatsappPhone, // from ?phone= on the incoming link, or '' if opened elsewhere
     city: city,
     direction: selDir,
     neighborhood: document.getElementById('c_neighborhood').value.trim(),
@@ -552,6 +575,7 @@ async function submitForm(){
   const row={
     id: entry.id,
     client_type: entry.clientType,
+    whatsapp_phone: entry.whatsappPhone || null,
     status: 'pending',
     source: 'inbox',
     city: entry.city || null,
@@ -622,7 +646,11 @@ function resetForm(){
     const el=document.getElementById(id); if(el) el.value=id==='c_city'?'الرياض':'';
   });
   document.getElementById('submitBtn').disabled=false;
-  setClientType('seller');
+  setClientType(initialRole==='buyer' ? 'buyer' : 'seller');
+  if(whatsappPhone){
+    const phoneEl=document.getElementById('c_sellerPhone');
+    if(phoneEl) phoneEl.value = whatsappPhone;
+  }
   DIRS.forEach(d=>{
     const btn=document.getElementById('dir_'+d); const c=DC[d];
     if(btn){ btn.className='dbtn'; btn.style.borderColor=c.badge+'20'; btn.style.background='rgba(255,255,255,.03)'; btn.style.color='#94a3b8'; }
