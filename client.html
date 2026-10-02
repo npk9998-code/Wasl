@@ -281,8 +281,9 @@ const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 // ── Incoming link parameters (?phone=9665XXXXXXXX&role=seller|buyer) ──
 // phone: optional. If present, it's the WhatsApp conversation number the
-//        customer arrived from; we prefill the phone field with it and also
-//        keep the raw value to store separately as whatsapp_phone.
+//        customer arrived from; the phone field is left empty so the customer
+//        can type any number, and this raw value is stored separately as
+//        whatsapp_phone (the confirmation message is sent to it).
 // role:  optional. If it's exactly 'seller' or 'buyer' we preselect that tab;
 //        the buttons stay fully interactive either way.
 const urlParams = new URLSearchParams(window.location.search);
@@ -315,10 +316,6 @@ function init(){
   // Apply incoming link parameters, if any
   if(initialRole==='seller' || initialRole==='buyer'){
     setClientType(initialRole);
-  }
-  if(whatsappPhone){
-    const phoneEl=document.getElementById('c_sellerPhone');
-    if(phoneEl) phoneEl.value = whatsappPhone;
   }
 }
 
@@ -573,10 +570,6 @@ function resetForm(){
   });
   document.getElementById('submitBtn').disabled=false;
   setClientType(initialRole==='buyer' ? 'buyer' : 'seller');
-  if(whatsappPhone){
-    const phoneEl=document.getElementById('c_sellerPhone');
-    if(phoneEl) phoneEl.value = whatsappPhone;
-  }
   DIRS.forEach(d=>{
     const btn=document.getElementById('dir_'+d); const c=DC[d];
     if(btn){ btn.className='dbtn'; btn.style.borderColor=c.badge+'20'; btn.style.background='rgba(255,255,255,.03)'; btn.style.color='#94a3b8'; }
